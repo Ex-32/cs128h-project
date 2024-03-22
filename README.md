@@ -3,7 +3,7 @@
 ## Group Name
 
 Biting off more than you can chew incorporated
-    
+
 ## Group Members
 
 - Jenna Fligor (`jflig2`)
@@ -18,9 +18,9 @@ Our project is a POSIX-gazing shell language. What we mean by that is we're not 
   - [ ] implement shell builtins like `cd`, `if`, `while`, and `for`
   - [ ] manipulate environment variables
   - [ ] environment variable interpolation
-  - [ ] shell interpolation
   - [ ] direct command output to file
 - [ ] advanced shell functionality
+  - [ ] shell interpolation
   - [ ] pipes
   - [ ] configurable prompt
   - [ ] script support
