@@ -60,7 +60,7 @@ This part of the program will probably be the simplest, it's purpose it to inter
 
 ### Parser
 
-This will probably be the hardest part of the program, we'll probably use something like the `pest` crate to define formal parsing expression grammar, which will make the parser relatively painless, but this part will also need to convert the string-based tree produced by the parser into a more compact abstract syntax tree (AST) before passing it off to the evaluator.
+This will probably be the hardest part of the program, we'll probably use something like the [`pest`](https://pest.rs/) crate to define formal parsing expression grammar, which will make the parser relatively painless, but this part will also need to convert the string-based tree produced by the parser into a more compact abstract syntax tree (AST) before passing it off to the evaluator.
 
 ### Evaluator
 
@@ -69,6 +69,10 @@ This part of the program will evaluate the AST an create command entry, which sp
 ### Process Manager
 
 This part of the program will perform builtin shell operations as well as instantiating child processes and directing their stdins and stdouts to the appropriate files/pipes where appropriate.
+
+### Timeline
+
+given that we both already know rust fairly well the tentative timeline is 1-2 weeks for the core functionality of the frontend, then 2-3 weeks for each aditional component, with another 2-3 weeks to debug inter-component comunication errors. at that point we can work on more advanced functionality, for example the while we'll write the parser to support shell interpolation we may not implement it in the evaluator until the basic "run a simple command" functionality of the whole project is working.
 
 ## Possible Challenges
 
