@@ -1,0 +1,17 @@
+
+# artifact directories
+debug/
+target/
+result/
+
+# system debris
+.DS_Store
+desktop.ini
+.[Tt]rash*
+
+# dev debris
+.vs
+.vscode
+.cache
+.direnv
+.envrc
