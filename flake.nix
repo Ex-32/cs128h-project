@@ -60,6 +60,7 @@
               name = "cs128h-project";
               packages = with pkgs; [
                 cargo
+                cargo-audit
                 clippy
                 rust-analyzer
                 rustc # this is to get rust-src for lsp hints in std
