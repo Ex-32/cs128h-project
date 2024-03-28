@@ -1,0 +1,54 @@
+
+WHITESPACE = _{ " " | "\t" | NEWLINE }
+COMMENT = _{ "#" ~ (!(NEWLINE) ~ ANY)* ~ NEWLINE }
+
+Main = { SOI ~ CommandLine ~ EOI }
+
+CommandLine = {
+    CommandEnv*
+    ~ Command
+    ~ (Redirection | Argument)*
+    ~ (Separator ~ CommandLine)?
+}
+
+Argument = {
+    ShellSubstitution
+    | SingleQuoteString
+    | DoubleQuoteString
+    | StringLiteral
+}
+Command = { SingleQuoteString | DoubleQuoteString | StringLiteral }
+
+Redirection = { RedirectOp ~ Argument }
+RedirectOp = ${ RedirectFd? ~ RedirectType }
+RedirectFd = ${ "&" | "0" | "1" | "2" }
+RedirectType = ${ ">>" | ">" | "<" }
+
+Separator = { ";" | "|" | "&" }
+
+CommandEnv = ${ EnvLiteral ~ "=" ~ Argument }
+EnvLiteral = ${ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+
+ShellSubstitution = { "(" ~ CommandLine ~ ")" }
+
+DoubleQuoteString = ${ "\"" ~ DoubleQuoteComponent* ~ "\"" }
+SingleQuoteString = ${ "'" ~ SingleQuoteInner ~ "'" }
+StringLiteral = ${ (!(WHITESPACE) ~ StringLiteralComponent)+ }
+
+DoubleQuoteComponent = ${ DollarShell | DollarEnv | Chars }
+SingleQuoteInner = @{ (!"'" ~ ANY)* }
+StringLiteralComponent = ${ DollarEnv | RawChars  }
+
+DollarEnv = ${ "$" ~ EnvLiteral }
+DollarShell = !{ "$(" ~ CommandLine ~ ")" }
+
+
+Chars = @{ Char+ }
+RawChars = @{ (!(WHITESPACE | "'" | "(" | ")" | Separator | RedirectType) ~ Char)+ }
+Char = {
+    !("\"" | "\\" | "$" | Separator ) ~ ANY
+    | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+}
+
+

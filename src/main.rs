@@ -1,8 +1,10 @@
 use crate::frontend::{Frontend, ReadlineError};
 use color_eyre::Result;
-use log::info;
+use log::{error, info};
 
+mod ast;
 mod frontend;
+mod parser;
 
 fn main() -> Result<()> {
     color_eyre::install()?;
@@ -23,7 +25,23 @@ fn main() -> Result<()> {
                 _ => return Err(e.into()),
             },
         };
-        println!("{}", input);
+        let ast = match ast::generate_ast(&input) {
+            Ok(x) => x,
+            Err(e) => {
+                match e {
+                    AstError::ParseError { parse_failure, .. } => {
+                        eprintln!("{}", *parse_failure);
+                    }
+                    AstError::RuleMismatch { .. } => {
+                        error!("{}", e);
+                    }
+                    AstError::FdSizeOverflow { .. } => {
+                        eprintln!("{}", e);
+                    }
+                };
+                continue;
+            }
+        };
     }
 
     Ok(())
