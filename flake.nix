@@ -30,6 +30,7 @@
         pkgs,
         ...
       }: let
+        name = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).package.name;
         overlays = [
           (import rust-overlay)
           (self: super: let
@@ -44,30 +45,26 @@
           crateTools = pkgs.callPackage "${rust-crate2nix}/tools.nix" {inherit pkgs;};
         in
           import (crateTools.generatedCargoNix {
-            name = "cs128-project";
+            inherit name;
             src = ./.;
           }) {
             inherit pkgs;
           };
       in rec {
-        packages = {
-          default = project.rootCrate.build;
-        };
-        devShells = {
-          default =
-            project.rootCrate.build
-            // pkgs.mkShell {
-              name = "cs128h-project";
-              packages = with pkgs; [
-                cargo
-                cargo-audit
-                clippy
-                rust-analyzer
-                rustc # this is to get rust-src for lsp hints in std
-                rustfmt
-              ];
-            };
-        };
+        packages.default = project.rootCrate.build;
+        devShells.default =
+          project.rootCrate.build
+          // pkgs.mkShell {
+            inherit name;
+            packages = with pkgs; [
+              cargo
+              cargo-audit
+              clippy
+              rust-analyzer
+              rustc # this is to get rust-src for lsp hints in std
+              rustfmt
+            ];
+          };
       };
     };
 }
