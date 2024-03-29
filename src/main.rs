@@ -1,4 +1,7 @@
-use crate::frontend::{Frontend, ReadlineError};
+use crate::{
+    ast::AstError,
+    frontend::{Frontend, ReadlineError},
+};
 use color_eyre::Result;
 use log::{error, info};
 
