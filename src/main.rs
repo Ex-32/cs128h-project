@@ -8,6 +8,7 @@ mod parser;
 
 static LOG_LEVEL_ENV: &'static str = "RS_SHELL_LOG";
 static LOG_STYLE_ENV: &'static str = "RS_SHELL_LOG_STYLE";
+
 fn main() -> Result<()> {
     color_eyre::install()?;
     env_logger::init_from_env(
@@ -39,7 +40,6 @@ fn main() -> Result<()> {
         debug!("successful AST generation");
         println!("{:#?}", ast);
     }
-
     info!("REPL loop exited without error, exiting");
     Ok(())
 }

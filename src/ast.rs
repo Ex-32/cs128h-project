@@ -5,15 +5,23 @@ use crate::parser::{Rule, ShellParser};
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum AstError {
-    #[error("parse error evaluating: '{line}'\n{parse_failure}")]
+    /// this error indicates that [`ShellParser`] failed to parse the string into pair data,
+    /// probably because the input was malformed
+    #[error("parser error evaluating: '{line}'\n{parse_failure}")]
     ParseError {
+        /// the line that the parser tried (and failed) to parse
         line: String,
+        /// the internal error thrown by the parser itself
         parse_failure: Box<pest::error::Error<Rule>>,
     },
 
+    /// this error should never be produced, if this error is produced then there is a logic error
+    /// in the AST generation code that should be reported as a bug
     #[error("unable to generate AST node '{node_type}' from parser Rule '{pair_type:?}'")]
     RuleMismatch {
+        /// the name of AST node that this implementation of [`FromPair`] was trying to creates
         node_type: &'static str,
+        /// the parser pair it was actually passed
         pair_type: Rule,
     },
 }
@@ -24,18 +32,28 @@ trait FromPair {
         Self: Sized;
 }
 
+/// top-level component of an AST, it contains a single [`CommandLine`] and enforces the
+/// requirement that the parser evaluate the entire input string.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Main(pub CommandLine);
 
+/// high-level AST component that describes an entire command including its arguments, environment
+/// variables, etc.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandLine {
+    /// one-shot environment variables to run the command with
     pub envs: Vec<CommandEnv>,
+    /// the actual command itself
     pub command: Command,
+    /// the arguments passed to the command
     pub arguments: Vec<Argument>,
+    /// stdio redirections
     pub redirects: Vec<Redirection>,
+    /// a possible second command chained with this one using syntax like `;` or `|`
     pub next: Option<(Separator, Box<CommandLine>)>,
 }
 
+/// mid-level AST component that describes an argument to a command
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Argument {
     StringLiteral(StringLiteral),
@@ -44,6 +62,8 @@ pub enum Argument {
     ShellSubstitution(ShellSubstitution),
 }
 
+/// mid-level AST component that describes a command, that is, the name or path of an executable or
+/// shell builtin
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
     StringLiteral(StringLiteral),
@@ -51,26 +71,35 @@ pub enum Command {
     DoubleQuoteString(DoubleQuoteString),
 }
 
+/// mid-level AST component that describes a redirection of a stdio fd to another file
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Redirection {
     pub op: RedirectOp,
     pub arg: Argument,
 }
 
+/// low-level AST component that defines a redirection operation, that is, the specific stdio fd
+/// that is being redirected and the type of redirection
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RedirectOp {
     fd: RedirectFd,
     r#type: RedirectType,
 }
 
+/// low-level AST component that defines the file descriptor to be redirected in a redirection.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RedirectFd {
+    /// the All variant refers to either stdout and stderr if used with [`RedirectType::Out`] or
+    /// [`RedirectType::OutAppend`] and to stdin, if used with [`RedirectType::In`]
     All,
+    /// default is stdout for output redirects and stdin for input redirects
+    Default,
     Stdin,
     Stdout,
     Stderr,
 }
 
+/// low-level AST component that defines the type of redirection to be performed
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RedirectType {
     Out,
@@ -78,52 +107,105 @@ pub enum RedirectType {
     In,
 }
 
+/// low-level AST component that defines how multiple [`CommandLine`]s should be chained together
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Separator {
+    /// run the first command, wait for it to finish, then run the second
     Semicolon,
+    /// run the first command, and then immediately run the second, piping the stdout of the first
+    /// to the stdin of the second
     Pipe,
+    /// run the first, and then immediately run the second
     Fork,
 }
 
+/// mid-level AST component that defines a one-shot environment variable to be set.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandEnv {
+    /// the name of the environment variable
     pub name: EnvLiteral,
+    /// the value of the environment variable
     pub value: Argument,
 }
 
+/// low-level AST component that defines the name of an environment variable
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnvLiteral(pub String);
+
+/// mid-level AST component that defines a shell substitution
+///
+/// effectively an entire child AST the output of evaluating & executing this inner AST becomes the
+/// value of the [`ShellSubstitution`] during when evaluated
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShellSubstitution(pub CommandLine);
+
+/// mid-level AST component that defines a string enclosed in double quotes
+///
+/// because double quoted strings can contain complex paces like variable and shell substitution,
+/// they're represented as a vector of [`DoubleQuoteComponent`]s each of which is evaluated
+/// differently and then concatenated together during evaluation
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DoubleQuoteString(pub Vec<DoubleQuoteComponent>);
+
+/// low-level AST component that defines a string enclosed in single quotes
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SingleQuoteString(pub String);
+
+/// mid-level AST component that defines a string not enclosed in quotes
+///
+/// because unquoted strings can contain variable substitutions they're represented as a vector of
+/// [`StringLiteralComponent`]s that are evaluated separately and then concatenated together during
+/// evaluation
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StringLiteral(pub Vec<StringLiteralComponent>);
 
+/// low-level AST component that defines part of a [`DoubleQuoteString`]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DoubleQuoteComponent {
+    /// literal characters
     Chars(Chars),
+    /// environment variable substitution
     DollarEnv(DollarEnv),
+    /// shell substitution
     DollarShell(DollarShell),
 }
 
+/// low-level AST component that defines part of a [`StringLiteral`]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StringLiteralComponent {
+    /// literal characters
     RawChars(RawChars),
+    /// environment variable substitution
     DollarEnv(DollarEnv),
 }
 
+/// low-level AST component that defines a environment variable substitution
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DollarEnv(pub EnvLiteral);
+
+/// low-level AST component that defines a shell substitution inside a string using the `$()`
+/// syntax
+///
+/// like [`ShellSubstitution`] this effectively contains an entire child AST that is evaluated and
+/// run to produce the final string value of this component
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DollarShell(pub CommandLine);
+
+/// low-level AST component that defines literal characters that are inside a double quoted string
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Chars(pub String);
+
+/// low-level AST component that defines literal characters that aren't quoted
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawChars(pub String);
 
+/// Parses a string into an AST acording to [`ShellParser`]
+///
+/// returns a [`Main`] struct, the top-level struct of an AST.
+///
+/// this function, and the implementations of [`FromPair`] that it relies on contain a large amount
+/// of [`unreachable!`] statements based on the parsing expression grammar defined in
+/// `src/grammar/shell.pest`, modify with caution
 pub fn generate_ast(expr: &str) -> Result<Main, AstError> {
     let pairs = match ShellParser::parse(Rule::Main, expr) {
         Ok(x) => x,
@@ -276,7 +358,7 @@ impl FromPair for RedirectOp {
                 pair_type: pair.as_rule(),
             });
         }
-        let mut fd = RedirectFd::Stdout;
+        let mut fd = RedirectFd::Default;
 
         let mut inner = pair.into_inner();
         let mut next = inner
