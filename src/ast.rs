@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use pest::{iterators::Pair, Parser};
 
 use crate::parser::{Rule, ShellParser};
@@ -7,7 +5,7 @@ use crate::parser::{Rule, ShellParser};
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum AstError {
-    #[error("parse error at: '{line}'\n{parse_failure}")]
+    #[error("parse error evaluating: '{line}'\n{parse_failure}")]
     ParseError {
         line: String,
         parse_failure: Box<pest::error::Error<Rule>>,
@@ -17,12 +15,6 @@ pub enum AstError {
     RuleMismatch {
         node_type: &'static str,
         pair_type: Rule,
-    },
-
-    #[error("file descriptor '{fd}' is invalid (max size {})", u32::MAX)]
-    FdSizeOverflow {
-        fd: String,
-        inner: std::num::ParseIntError,
     },
 }
 
@@ -147,7 +139,6 @@ pub fn generate_ast(expr: &str) -> Result<Main, AstError> {
         Main::from_pair(pairs.into_iter().next().ok_or_else(|| {
             unreachable!("result of parsing Rule::Main must contain an inner pair")
         })?)?;
-    println!("{:#?}", main);
     Ok(main)
 }
 
