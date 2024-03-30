@@ -1,7 +1,4 @@
-use crate::{
-    evaluator::Evaluator,
-    frontend::{Frontend, ReadlineError},
-};
+use crate::frontend::{Frontend, ReadlineError};
 use color_eyre::Result;
 use log::{debug, error, info};
 
