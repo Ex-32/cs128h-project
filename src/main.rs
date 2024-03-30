@@ -1,8 +1,12 @@
-use crate::frontend::{Frontend, ReadlineError};
+use crate::{
+    evaluator::Evaluator,
+    frontend::{Frontend, ReadlineError},
+};
 use color_eyre::Result;
 use log::{debug, error, info};
 
 mod ast;
+mod evaluator;
 mod frontend;
 mod parser;
 
@@ -20,6 +24,8 @@ fn main() -> Result<()> {
 
     let mut frontend = Frontend::new()?;
     debug!("constructed frontend singleton");
+    let mut evaluator = Evaluator::new();
+    debug!("constructed evaluator singleton");
 
     loop {
         let input = match frontend.readline() {
@@ -39,6 +45,7 @@ fn main() -> Result<()> {
         };
         debug!("successful AST generation");
         println!("{:#?}", ast);
+        evaluator.dispatch(ast)?;
     }
     info!("REPL loop exited without error, exiting");
     Ok(())
