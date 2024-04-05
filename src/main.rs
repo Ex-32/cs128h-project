@@ -2,8 +2,10 @@ use crate::{
     evaluator::Evaluator,
     frontend::{Frontend, ReadlineError},
 };
+use clap::Parser;
 use color_eyre::Result;
 use log::{debug, error, info};
+use std::process::ExitCode;
 
 mod ast;
 mod evaluator;
@@ -13,7 +15,15 @@ mod parser;
 static LOG_LEVEL_ENV: &'static str = "RS_SHELL_LOG";
 static LOG_STYLE_ENV: &'static str = "RS_SHELL_LOG_STYLE";
 
-fn main() -> Result<()> {
+#[derive(Debug, Clone, Parser)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// evaluate given expression and then exit
+    #[arg(short, long)]
+    command: Option<String>,
+}
+
+fn main() -> Result<ExitCode> {
     color_eyre::install()?;
     env_logger::init_from_env(
         env_logger::Env::new()
@@ -22,10 +32,18 @@ fn main() -> Result<()> {
     );
     info!("global logger initalized");
 
-    let mut frontend = Frontend::new()?;
-    debug!("constructed frontend singleton");
+    let args = Args::parse();
+
     let mut evaluator = Evaluator::new();
     debug!("constructed evaluator singleton");
+
+    if let Some(cmd) = args.command {
+        let ast = ast::generate_ast(&cmd)?;
+        return Ok(ExitCode::from(evaluator.eval(ast)?));
+    }
+
+    let mut frontend = Frontend::new()?;
+    debug!("constructed frontend singleton");
 
     loop {
         let input = match frontend.readline() {
@@ -45,8 +63,8 @@ fn main() -> Result<()> {
         };
         debug!("successful AST generation");
         println!("{:#?}", ast);
-        evaluator.dispatch(ast)?;
+        evaluator.eval(ast)?;
     }
     info!("REPL loop exited without error, exiting");
-    Ok(())
+    Ok(ExitCode::SUCCESS)
 }

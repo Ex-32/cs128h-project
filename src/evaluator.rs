@@ -10,7 +10,7 @@ pub enum EvalError {
         /// the result of calling `.to_string_lossy()` on the invalid value, should only be used
         /// for printing the malformed value as invalid sections are replaced with the unicode
         /// replacement character
-        value: String
+        value: String,
     },
 }
 
@@ -32,8 +32,8 @@ impl Evaluator {
         Self {}
     }
 
-    pub fn dispatch(&mut self, ast: Main) -> Result<(), EvalError> {
-        let flattened = self.flatten_commandline(ast.0)?;
+    pub fn eval(&mut self, ast: Main) -> Result<u8, EvalError> {
+        let flattened = dbg!(self.flatten_commandline(ast.0)?);
 
         todo!()
     }
@@ -147,7 +147,7 @@ impl Evaluator {
     }
 
     fn flatten_string_linteral_component(
-        &mut self,
+        &self,
         component: StringLiteralComponent,
     ) -> Result<String, EvalError> {
         match component {
@@ -161,7 +161,7 @@ impl Evaluator {
         self.flatten_shell_substitution(ShellSubstitution(shell.0))
     }
 
-    fn flatten_dollar_env(&mut self, env: DollarEnv) -> Result<String, EvalError> {
+    fn flatten_dollar_env(&self, env: DollarEnv) -> Result<String, EvalError> {
         match std::env::var(&env.0 .0) {
             Ok(x) => Ok(x),
             Err(std::env::VarError::NotPresent) => Ok(String::new()),
@@ -175,7 +175,7 @@ impl Evaluator {
     // TODO: implement this command
     fn flatten_shell_substitution(&mut self, sub: ShellSubstitution) -> Result<String, EvalError> {
         let flat = self.flatten_commandline(sub.0)?;
-        Ok(format!("<PLACEHOLDER ({:?})>", flat))
+        todo!("shell substitution not yet implemented :(");
     }
 }
 
