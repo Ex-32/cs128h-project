@@ -14,13 +14,13 @@ Biting off more than you can chew incorporated
 Our project is a POSIX-gazing shell language. What we mean by that is we're not trying to make our shell POSIX compliant, but rather we're modeling our functionality after what POSIX defines while refining the syntax to be a little cleaner. An additional motivation of forgoing POSIX compliance is to give us some flexibility in implementation, a shell is a very complex piece of software and we don't expect to have a 100% complete product by the end of the class, we're hoping to complete everything under the "basic shell functionality" goals, but the other goals are largely aspirational.
 
 - [ ] basic shell functionality
-  - [ ] run commands
+  - [x] run commands
   - [ ] implement shell builtins like `cd`, `if`, `while`, and `for`
-  - [ ] manipulate environment variables
-  - [ ] environment variable interpolation
-  - [ ] direct command output to file
+  - [x] manipulate environment variables
+  - [x] environment variable interpolation
+  - [x] direct command output to file
 - [ ] advanced shell functionality
-  - [ ] shell interpolation
+  - [x] shell interpolation
   - [ ] pipes
   - [ ] configurable prompt
   - [ ] script support
