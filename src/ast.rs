@@ -2,7 +2,7 @@ use pest::{iterators::Pair, Parser};
 
 use crate::parser::{Rule, ShellParser};
 
-#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
+#[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
 pub enum AstError {
     /// this error indicates that [`ShellParser`] failed to parse the string into pair data,
@@ -82,8 +82,8 @@ pub struct Redirection {
 /// that is being redirected and the type of redirection
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RedirectOp {
-    fd: RedirectFd,
-    r#type: RedirectType,
+    pub fd: RedirectFd,
+    pub r#type: RedirectType,
 }
 
 /// low-level AST component that defines the file descriptor to be redirected in a redirection.

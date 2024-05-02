@@ -1,6 +1,11 @@
-use crate::ast::*;
+use subprocess::ExitStatus;
 
-#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
+use crate::{
+    ast::*,
+    proc_manager::{ProcError, ProcManager},
+};
+
+#[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
 pub enum EvalError {
     #[error("enviroment variable {name} is not valud utf-8: {value}")]
@@ -12,14 +17,19 @@ pub enum EvalError {
         /// replacement character
         value: String,
     },
+
+    #[error("evaluator recived error attempting to dispath command: {internal}")]
+    DispatchError { internal: ProcError },
 }
 
 #[derive(Debug)]
 #[non_exhaustive]
-pub struct Evaluator {}
+pub struct Evaluator {
+    proc_manager: ProcManager,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct FlattenedCmdline {
+pub struct FlattenedCmdline {
     pub envs: Vec<(String, String)>,
     pub command: String,
     pub arguments: Vec<String>,
@@ -29,13 +39,17 @@ struct FlattenedCmdline {
 
 impl Evaluator {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            proc_manager: ProcManager::new(),
+        }
     }
 
-    pub fn eval(&mut self, ast: Main) -> Result<u8, EvalError> {
-        let flattened = dbg!(self.flatten_commandline(ast.0)?);
-
-        todo!()
+    pub fn eval(&mut self, ast: Main) -> Result<ExitStatus, EvalError> {
+        let flattened = self.flatten_commandline(ast.0)?;
+        match self.proc_manager.dispatch(flattened) {
+            Ok(x) => Ok(x),
+            Err(e) => Err(EvalError::DispatchError { internal: e }),
+        }
     }
 
     fn flatten_commandline(&mut self, cmdline: CommandLine) -> Result<FlattenedCmdline, EvalError> {
@@ -175,7 +189,11 @@ impl Evaluator {
     // TODO: implement this command
     fn flatten_shell_substitution(&mut self, sub: ShellSubstitution) -> Result<String, EvalError> {
         let flat = self.flatten_commandline(sub.0)?;
-        todo!("shell substitution not yet implemented :(");
+        Ok(self
+            .proc_manager
+            .dispatch_sub(flat)
+            .map_err(|e| EvalError::DispatchError { internal: e })?
+            .1)
     }
 }
 
