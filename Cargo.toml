@@ -9,8 +9,10 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.5.3", features = ["derive"] }
 color-eyre = "0.6.3"
+dirs-next = "2.0.0"
+env_logger = "0.11.3"
+log = "0.4.21"
+pest = "2.7.8"
+pest_derive = "2.7.8"
 rustyline = "14.0.0"
 thiserror = "1.0.58"
-dirs-next = "2.0.0"
-log = "0.4.21"
-env_logger = "0.11.3"

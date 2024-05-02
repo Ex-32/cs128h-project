@@ -1,19 +1,25 @@
 use crate::frontend::{Frontend, ReadlineError};
 use color_eyre::Result;
-use log::info;
+use log::{debug, error, info};
 
+mod ast;
 mod frontend;
+mod parser;
+
+static LOG_LEVEL_ENV: &'static str = "RS_SHELL_LOG";
+static LOG_STYLE_ENV: &'static str = "RS_SHELL_LOG_STYLE";
 
 fn main() -> Result<()> {
     color_eyre::install()?;
     env_logger::init_from_env(
         env_logger::Env::new()
-            .filter("RS_SHELL_LOG")
-            .write_style("RS_SHELL_LOG_STYLE"),
+            .filter_or(LOG_LEVEL_ENV, "warn")
+            .write_style(LOG_STYLE_ENV),
     );
     info!("global logger initalized");
 
     let mut frontend = Frontend::new()?;
+    debug!("constructed frontend singleton");
 
     loop {
         let input = match frontend.readline() {
@@ -23,8 +29,17 @@ fn main() -> Result<()> {
                 _ => return Err(e.into()),
             },
         };
-        println!("{}", input);
+        debug!("read line from user: '{}'", input);
+        let ast = match ast::generate_ast(&input) {
+            Ok(x) => x,
+            Err(e) => {
+                error!("{}", e);
+                continue;
+            }
+        };
+        debug!("successful AST generation");
+        println!("{:#?}", ast);
     }
-
+    info!("REPL loop exited without error, exiting");
     Ok(())
 }
