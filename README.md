@@ -21,7 +21,7 @@ Our project is a POSIX-gazing shell language. What we mean by that is we're not 
   - [x] direct command output to file
 - [ ] advanced shell functionality
   - [x] shell interpolation
-  - [ ] pipes
+  - [x] pipes
   - [ ] configurable prompt
   - [ ] script support
   - [ ] background jobs

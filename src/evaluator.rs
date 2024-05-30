@@ -1,7 +1,10 @@
+use std::ffi::OsString;
+
 use subprocess::ExitStatus;
 
 use crate::{
     ast::*,
+    env,
     proc_manager::{ProcError, ProcManager},
 };
 
@@ -30,10 +33,10 @@ pub struct Evaluator {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlattenedCmdline {
-    pub envs: Vec<(String, String)>,
-    pub command: String,
-    pub arguments: Vec<String>,
-    pub redirects: Vec<(RedirectOp, String)>,
+    pub envs: Vec<(OsString, OsString)>,
+    pub command: OsString,
+    pub arguments: Vec<OsString>,
+    pub redirects: Vec<(RedirectOp, OsString)>,
     pub next: Option<(Separator, Box<FlattenedCmdline>)>,
 }
 
@@ -83,7 +86,7 @@ impl Evaluator {
         })
     }
 
-    fn flatten_argument(&mut self, arg: Argument) -> Result<String, EvalError> {
+    fn flatten_argument(&mut self, arg: Argument) -> Result<OsString, EvalError> {
         match arg {
             Argument::ShellSubstitution(x) => self.flatten_shell_substitution(x),
             Argument::StringLiteral(x) => self.flatten_string_literal(x),
@@ -92,7 +95,7 @@ impl Evaluator {
         }
     }
 
-    fn flatten_command(&mut self, cmd: Command) -> Result<String, EvalError> {
+    fn flatten_command(&mut self, cmd: Command) -> Result<OsString, EvalError> {
         match cmd {
             Command::StringLiteral(x) => self.flatten_string_literal(x),
             Command::SingleQuoteString(x) => self.flatten_single_string(x),
@@ -101,12 +104,12 @@ impl Evaluator {
     }
 
     #[inline]
-    fn flatten_redirection(&mut self, red: Redirection) -> Result<(RedirectOp, String), EvalError> {
+    fn flatten_redirection(&mut self, red: Redirection) -> Result<(RedirectOp, OsString), EvalError> {
         Ok((red.op, self.flatten_argument(red.arg)?))
     }
 
     #[inline]
-    fn flatten_command_env(&mut self, env: CommandEnv) -> Result<(String, String), EvalError> {
+    fn flatten_command_env(&mut self, env: CommandEnv) -> Result<(OsString, OsString), EvalError> {
         Ok((
             self.flatten_env_litteral(env.name)?,
             self.flatten_argument(env.value)?,
@@ -114,37 +117,35 @@ impl Evaluator {
     }
 
     #[inline]
-    fn flatten_env_litteral(&self, env: EnvLiteral) -> Result<String, EvalError> {
+    fn flatten_env_litteral(&self, env: EnvLiteral) -> Result<OsString, EvalError> {
         Ok(env.0)
     }
 
-    fn flatten_double_string(&mut self, string: DoubleQuoteString) -> Result<String, EvalError> {
+    fn flatten_double_string(&mut self, string: DoubleQuoteString) -> Result<OsString, EvalError> {
         Ok(string
             .0
             .into_iter()
             .map(|x| self.flatten_double_string_component(x))
             .collect::<Result<Vec<_>, EvalError>>()?
             .into_iter()
-            .fold(String::new(), |mut acc, x| {
-                acc.push_str(&x);
+            .fold(OsString::new(), |mut acc, x| {
+                acc.push(&x);
                 acc
             }))
     }
 
     #[inline]
-    fn flatten_single_string(&self, string: SingleQuoteString) -> Result<String, EvalError> {
+    fn flatten_single_string(&self, string: SingleQuoteString) -> Result<OsString, EvalError> {
         Ok(string.0)
     }
 
-    fn flatten_string_literal(&mut self, string: StringLiteral) -> Result<String, EvalError> {
+    fn flatten_string_literal(&mut self, string: StringLiteral) -> Result<OsString, EvalError> {
         Ok(string
             .0
             .into_iter()
             .map(|x| self.flatten_string_linteral_component(x))
-            .collect::<Result<Vec<_>, EvalError>>()?
-            .into_iter()
-            .fold(String::new(), |mut acc, x| {
-                acc.push_str(&x);
+            .fold(OsString::new(), |mut acc, x| {
+                acc.push(&x);
                 acc
             }))
     }
@@ -152,10 +153,10 @@ impl Evaluator {
     fn flatten_double_string_component(
         &mut self,
         component: DoubleQuoteComponent,
-    ) -> Result<String, EvalError> {
+    ) -> Result<OsString, EvalError> {
         match component {
             DoubleQuoteComponent::Chars(x) => Ok(x.0),
-            DoubleQuoteComponent::DollarEnv(x) => self.flatten_dollar_env(x),
+            DoubleQuoteComponent::DollarEnv(x) => Ok(self.flatten_dollar_env(x)),
             DoubleQuoteComponent::DollarShell(x) => self.flatten_dollar_shell(x),
         }
     }
@@ -163,35 +164,28 @@ impl Evaluator {
     fn flatten_string_linteral_component(
         &self,
         component: StringLiteralComponent,
-    ) -> Result<String, EvalError> {
+    ) -> OsString {
         match component {
-            StringLiteralComponent::RawChars(x) => Ok(x.0),
+            StringLiteralComponent::RawChars(x) => x.0,
             StringLiteralComponent::DollarEnv(x) => self.flatten_dollar_env(x),
         }
     }
 
     #[inline]
-    fn flatten_dollar_shell(&mut self, shell: DollarShell) -> Result<String, EvalError> {
+    fn flatten_dollar_shell(&mut self, shell: DollarShell) -> Result<OsString, EvalError> {
         self.flatten_shell_substitution(ShellSubstitution(shell.0))
     }
 
-    fn flatten_dollar_env(&self, env: DollarEnv) -> Result<String, EvalError> {
-        match std::env::var(&env.0 .0) {
-            Ok(x) => Ok(x),
-            Err(std::env::VarError::NotPresent) => Ok(String::new()),
-            Err(std::env::VarError::NotUnicode(x)) => Err(EvalError::InvalidEnvValue {
-                name: env.0 .0,
-                value: x.to_string_lossy().to_string(),
-            }),
-        }
+    fn flatten_dollar_env(&self, env: DollarEnv) -> OsString {
+        env::get(&env.0.0)
     }
 
     // TODO: implement this command
-    fn flatten_shell_substitution(&mut self, sub: ShellSubstitution) -> Result<String, EvalError> {
+    fn flatten_shell_substitution(&mut self, sub: ShellSubstitution) -> Result<OsString, EvalError> {
         let flat = self.flatten_commandline(sub.0)?;
         Ok(self
             .proc_manager
-            .dispatch_sub(flat)
+            .dispatch_capture(flat)
             .map_err(|e| EvalError::DispatchError { internal: e })?
             .1)
     }
@@ -209,10 +203,10 @@ mod tests {
 
         let manual_flatten = FlattenedCmdline {
             envs: Vec::new(),
-            command: "test".to_owned(),
+            command: OsString::from("test"),
             arguments: vec!["0", "1", "2"]
                 .into_iter()
-                .map(|x| String::from(x))
+                .map(|x| OsString::from(x))
                 .collect(),
             redirects: Vec::new(),
             next: None,

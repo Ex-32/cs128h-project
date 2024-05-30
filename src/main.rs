@@ -1,5 +1,5 @@
 use crate::{
-    evaluator::{Evaluator, EvalError},
+    evaluator::{EvalError, Evaluator},
     frontend::{Frontend, ReadlineError},
 };
 use clap::Parser;
@@ -8,6 +8,8 @@ use log::{debug, error, info};
 use std::process::ExitCode;
 
 mod ast;
+mod builtins;
+mod env;
 mod evaluator;
 mod frontend;
 mod parser;
@@ -71,9 +73,12 @@ fn main() -> Result<ExitCode> {
         if let Err(e) = evaluator.eval(ast) {
             match e {
                 EvalError::InvalidEnvValue { name, value } => {
-                    error!("environment variable '{}' is not valid UTF-8: {}", name, value);
-                },
-                EvalError::DispatchError { internal } =>  {
+                    error!(
+                        "environment variable '{}' is not valid UTF-8: {}",
+                        name, value
+                    );
+                }
+                EvalError::DispatchError { internal } => {
                     error!("error dispatching command:\n{}", internal);
                 }
             }

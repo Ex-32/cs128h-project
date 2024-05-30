@@ -1,4 +1,3 @@
-
 use color_eyre::Result;
 pub use rustyline::error::ReadlineError;
 use rustyline::{history::DefaultHistory, Editor};

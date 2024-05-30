@@ -1,3 +1,5 @@
+use std::ffi::OsString;
+
 use pest::{iterators::Pair, Parser};
 
 use crate::parser::{Rule, ShellParser};
@@ -130,7 +132,7 @@ pub struct CommandEnv {
 
 /// low-level AST component that defines the name of an environment variable
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EnvLiteral(pub String);
+pub struct EnvLiteral(pub OsString);
 
 /// mid-level AST component that defines a shell substitution
 ///
@@ -149,7 +151,7 @@ pub struct DoubleQuoteString(pub Vec<DoubleQuoteComponent>);
 
 /// low-level AST component that defines a string enclosed in single quotes
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SingleQuoteString(pub String);
+pub struct SingleQuoteString(pub OsString);
 
 /// mid-level AST component that defines a string not enclosed in quotes
 ///
@@ -193,11 +195,11 @@ pub struct DollarShell(pub CommandLine);
 
 /// low-level AST component that defines literal characters that are inside a double quoted string
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Chars(pub String);
+pub struct Chars(pub OsString);
 
 /// low-level AST component that defines literal characters that aren't quoted
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RawChars(pub String);
+pub struct RawChars(pub OsString);
 
 /// Parses a string into an AST acording to [`ShellParser`]
 ///
@@ -217,10 +219,12 @@ pub fn generate_ast(expr: &str) -> Result<Main, AstError> {
         }
     };
 
-    let main =
-        Main::from_pair(pairs.into_iter().next().ok_or_else(|| {
-            unreachable!("result of parsing Rule::Main must contain an inner pair")
-        })?)?;
+    let main = Main::from_pair(
+        pairs
+            .into_iter()
+            .next()
+            .expect("result of parsing Rule::Main must contain an inner pair"),
+    )?;
     Ok(main)
 }
 
@@ -235,7 +239,7 @@ impl FromPair for Main {
         Ok(Self(CommandLine::from_pair(
             pair.into_inner()
                 .next()
-                .ok_or_else(|| unreachable!("Main Pair must contain CommandLine"))?,
+                .expect("Main Pair must contain CommandLine"),
         )?))
     }
 }
@@ -264,9 +268,10 @@ impl FromPair for CommandLine {
         let next = if let Some(sep) = next_sep {
             Some((
                 sep,
-                Box::new(next_cmd.ok_or_else(|| {
-                    unreachable!("if CommandLine has Seperator it must also have child CommandLine")
-                })?),
+                Box::new(
+                    next_cmd
+                        .expect("if CommandLine has Seperator it must also have child CommandLine"),
+                ),
             ))
         } else {
             None
@@ -274,7 +279,7 @@ impl FromPair for CommandLine {
 
         Ok(Self {
             envs,
-            command: command.ok_or_else(|| unreachable!("Commandline must contain Command"))?,
+            command: command.expect("Commandline must contain Command"),
             arguments,
             redirects,
             next,
@@ -293,7 +298,7 @@ impl FromPair for Argument {
         let inner = pair
             .into_inner()
             .next()
-            .ok_or_else(|| unreachable!("Argument must contain inner pair"))?;
+            .expect("Argument must contain inner pair");
         Ok(match inner.as_rule() {
             Rule::ShellSubstitution => Self::ShellSubstitution(ShellSubstitution::from_pair(inner)?),
             Rule::SingleQuoteString => Self::SingleQuoteString(SingleQuoteString::from_pair(inner)?),
@@ -317,7 +322,7 @@ impl FromPair for Command {
         let inner = pair
             .into_inner()
             .next()
-            .ok_or_else(|| unreachable!("Command must contain inner pair"))?;
+            .expect("Command must contain inner pair");
         Ok(match inner.as_rule() {
             Rule::SingleQuoteString => {
                 Self::SingleQuoteString(SingleQuoteString::from_pair(inner)?)
@@ -341,11 +346,11 @@ impl FromPair for Redirection {
                 pair_type: pair.as_rule(),
             });
         }
-        let unreachable = || unreachable!("Redirection must contain at least two inner pairs");
+        const ERR_MSG: &str = "Redirection must contain at least two inner pairs";
         let mut inner = pair.into_inner();
         Ok(Self {
-            op: RedirectOp::from_pair(inner.next().ok_or_else(unreachable)?)?,
-            arg: Argument::from_pair(inner.next().ok_or_else(unreachable)?)?,
+            op: RedirectOp::from_pair(inner.next().expect(ERR_MSG))?,
+            arg: Argument::from_pair(inner.next().expect(ERR_MSG))?,
         })
     }
 }
@@ -361,14 +366,12 @@ impl FromPair for RedirectOp {
         let mut fd = RedirectFd::Default;
 
         let mut inner = pair.into_inner();
-        let mut next = inner
-            .next()
-            .ok_or_else(|| unreachable!("RedirectOp must contain inner pair"))?;
+        let mut next = inner.next().expect("RedirectOp must contain inner pair");
         if let Rule::RedirectFd = next.as_rule() {
             fd = RedirectFd::from_pair(next)?;
             next = inner
                 .next()
-                .ok_or_else(|| unreachable!("RedirectOp must contain a RedirectType"))?;
+                .expect("RedirectOp must contain a RedirectType");
         }
 
         Ok(Self {
@@ -438,11 +441,11 @@ impl FromPair for CommandEnv {
                 pair_type: pair.as_rule(),
             });
         }
-        let unreachable = || unreachable!("CommandEnv must contain at least two inner pairs");
+        const ERR_MSG: &str = "CommandEnv must contain at least two inner pairs";
         let mut inner = pair.into_inner();
         Ok(Self {
-            name: EnvLiteral::from_pair(inner.next().ok_or_else(unreachable)?)?,
-            value: Argument::from_pair(inner.next().ok_or_else(unreachable)?)?,
+            name: EnvLiteral::from_pair(inner.next().expect(ERR_MSG))?,
+            value: Argument::from_pair(inner.next().expect(ERR_MSG))?,
         })
     }
 }
@@ -455,7 +458,7 @@ impl FromPair for EnvLiteral {
                 pair_type: pair.as_rule(),
             });
         }
-        Ok(Self(pair.as_str().to_owned()))
+        Ok(Self(pair.as_str().into()))
     }
 }
 
@@ -470,7 +473,7 @@ impl FromPair for ShellSubstitution {
         Ok(Self(CommandLine::from_pair(
             pair.into_inner()
                 .next()
-                .ok_or_else(|| unreachable!("ShellSubstitution must contain inner pair"))?,
+                .expect("ShellSubstitution must contain inner pair"),
         )?))
     }
 }
@@ -502,9 +505,9 @@ impl FromPair for SingleQuoteString {
         Ok(Self(
             pair.into_inner()
                 .next()
-                .ok_or_else(|| unreachable!("SingleQuoteString must contain inner pair"))?
+                .expect("SingleQuoteString must contain inner pair")
                 .as_str()
-                .to_owned(),
+                .into(),
         ))
     }
 }
@@ -536,7 +539,7 @@ impl FromPair for DoubleQuoteComponent {
         let inner = pair
             .into_inner()
             .next()
-            .ok_or_else(|| unreachable!("DoubleQuoteComponent must contain inner pair"))?;
+            .expect("DoubleQuoteComponent must contain inner pair");
         Ok(match inner.as_rule() {
             Rule::Chars => Self::Chars(Chars::from_pair(inner)?),
             Rule::DollarEnv => Self::DollarEnv(DollarEnv::from_pair(inner)?),
@@ -559,7 +562,7 @@ impl FromPair for StringLiteralComponent {
         let inner = pair
             .into_inner()
             .next()
-            .ok_or_else(|| unreachable!("StringLiteralComponent must contain inner pair"))?;
+            .expect("StringLiteralComponent must contain inner pair");
         Ok(match inner.as_rule() {
             Rule::RawChars => Self::RawChars(RawChars::from_pair(inner)?),
             Rule::DollarEnv => Self::DollarEnv(DollarEnv::from_pair(inner)?),
@@ -579,7 +582,7 @@ impl FromPair for DollarEnv {
         Ok(Self(EnvLiteral::from_pair(
             pair.into_inner()
                 .next()
-                .ok_or_else(|| unreachable!("DollarEnv Pair must contain inner pair"))?,
+                .expect("DollarEnv Pair must contain inner pair"),
         )?))
     }
 }
@@ -595,7 +598,7 @@ impl FromPair for DollarShell {
         Ok(Self(CommandLine::from_pair(
             pair.into_inner()
                 .next()
-                .ok_or_else(|| unreachable!("DollarShell Pair must contain inner pair"))?,
+                .expect("DollarShell Pair must contain inner pair"),
         )?))
     }
 }
@@ -608,7 +611,7 @@ impl FromPair for Chars {
                 pair_type: pair.as_rule(),
             });
         }
-        Ok(Chars(pair.as_str().to_owned()))
+        Ok(Chars(pair.as_str().into()))
     }
 }
 
@@ -620,7 +623,7 @@ impl FromPair for RawChars {
                 pair_type: pair.as_rule(),
             });
         }
-        Ok(RawChars(pair.as_str().to_owned()))
+        Ok(RawChars(pair.as_str().into()))
     }
 }
 
@@ -633,15 +636,15 @@ mod tests {
         let manual_ast = Main(CommandLine {
             envs: Vec::new(),
             command: Command::StringLiteral(StringLiteral(vec![StringLiteralComponent::RawChars(
-                RawChars("test".to_owned()),
+                RawChars("test".into()),
             )])),
             arguments: vec![
                 Argument::StringLiteral(StringLiteral(vec![StringLiteralComponent::RawChars(
-                    RawChars("0".to_owned()),
+                    RawChars("0".into()),
                 )])),
-                Argument::SingleQuoteString(SingleQuoteString("1".to_owned())),
+                Argument::SingleQuoteString(SingleQuoteString("1".into())),
                 Argument::DoubleQuoteString(DoubleQuoteString(vec![DoubleQuoteComponent::Chars(
-                    Chars("2".to_owned()),
+                    Chars("2".into()),
                 )])),
             ],
             redirects: vec![],
